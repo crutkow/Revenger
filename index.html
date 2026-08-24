@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="description" content="Revenger — a top-down space battle simulator." />
+    <meta name="theme-color" content="#05070f" />
+    <title>Revenger — Space Battle Simulator</title>
+  </head>
+  <body>
+    <!--
+      Phaser injects its WebGL canvas into #game-root (gameplay world).
+      PixiOverlay stacks a second, transparent canvas on top (HUD / FX).
+    -->
+    <div id="game-root" aria-label="Game viewport" role="application">
+      <div id="boot-splash">Loading Revenger…</div>
+    </div>
+
+    <noscript>
+      <p style="color: #fff; font: 16px sans-serif; padding: 24px">
+        Revenger requires JavaScript and WebGL to run.
+      </p>
+    </noscript>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
