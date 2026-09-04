@@ -8,8 +8,8 @@ export type TurnDirection = -1 | 0 | 1;
  * Texture points along +X, so `angle` is also the thrust direction.
  */
 export class Ship extends Phaser.Physics.Arcade.Sprite {
-  shields = Gameplay.playerStartShields;
-  readonly maxShields = Gameplay.playerStartShields;
+  shields: number = Gameplay.playerStartShields;
+  readonly maxShields: number = Gameplay.playerStartShields;
 
   private invulnerableUntil = 0;
   private lastFiredAt = 0;
