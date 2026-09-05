@@ -28,7 +28,7 @@ export class HudLayer extends Container {
   private readonly scoreLabel = new Text({ text: 'SCORE', style: labelStyle });
   private readonly scoreValue = new Text({ text: '0', style: valueStyle });
   private readonly fpsValue = new Text({ text: '60 FPS', style: { ...labelStyle, fontSize: 12 } });
-  private readonly shieldLabel = new Text({ text: 'SHIELDS', style: labelStyle });
+  private readonly shieldLabel = new Text({ text: 'HULL', style: labelStyle });
   private readonly shieldBar = new Graphics();
   private readonly message = new Text({
     text: '',
@@ -125,17 +125,19 @@ export class HudLayer extends Container {
   }
 
   private drawShieldBar(): void {
-    const segmentWidth = 34;
-    const segmentHeight = 8;
-    const gap = 6;
+    const barWidth = 240;
+    const barHeight = 8;
 
     this.shieldBar.clear();
-    for (let i = 0; i < this.maxShields; i += 1) {
-      const filled = i < this.shields;
-      this.shieldBar
-        .rect(i * (segmentWidth + gap), 0, segmentWidth, segmentHeight)
-        .fill({ color: filled ? HUD_COLOR : DANGER_COLOR, alpha: filled ? 1 : 0.18 });
-    }
+    if (this.maxShields <= 0) return;
+
+    const ratio = Math.max(0, Math.min(1, this.shields / this.maxShields));
+    const color = ratio > 0.3 ? HUD_COLOR : DANGER_COLOR;
+    this.shieldBar
+      .rect(0, 0, barWidth, barHeight)
+      .fill({ color: DANGER_COLOR, alpha: 0.18 })
+      .rect(0, 0, barWidth * ratio, barHeight)
+      .fill({ color, alpha: 1 });
 
     // Keep the bar pinned to the bottom-left after layout changes.
     if (this.viewWidth > 0 && this.viewHeight > 0) {

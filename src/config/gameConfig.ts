@@ -4,6 +4,7 @@ import { BootScene } from '@/scenes/BootScene';
 import { PreloadScene } from '@/scenes/PreloadScene';
 import { MainMenuScene } from '@/scenes/MainMenuScene';
 import { BattleScene } from '@/scenes/BattleScene';
+import { ShipyardScene } from '@/scenes/ShipyardScene';
 
 export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.WEBGL,
@@ -35,5 +36,5 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
   },
   autoFocus: true,
   disableContextMenu: true,
-  scene: [BootScene, PreloadScene, MainMenuScene, BattleScene],
+  scene: [BootScene, PreloadScene, MainMenuScene, BattleScene, ShipyardScene],
 };

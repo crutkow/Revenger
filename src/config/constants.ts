@@ -7,18 +7,27 @@ export const SceneKeys = {
   Preload: 'preload',
   MainMenu: 'main-menu',
   Battle: 'battle',
+  Shipyard: 'shipyard',
 } as const;
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];
 
-/** Textures are generated procedurally in PreloadScene, so no binary assets are required. */
+/** Procedural textures are generated in PreloadScene; the ship atlases are real files. */
 export const TextureKeys = {
-  Ship: 'tex-ship',
   Bullet: 'tex-bullet',
   Asteroid: 'tex-asteroid',
   Starfield: 'tex-starfield',
   Particle: 'tex-particle',
+  ShipAtlasGse: 'atlas-ship-gse',
+  ShipAtlasPoer: 'atlas-ship-poer',
 } as const;
 export type TextureKey = (typeof TextureKeys)[keyof typeof TextureKeys];
+
+/** Faction skins, both sharing the tile layout described in `shipAtlas.ts`. */
+export const ShipFactions = {
+  Gse: TextureKeys.ShipAtlasGse,
+  Poer: TextureKeys.ShipAtlasPoer,
+} as const;
+export type ShipFaction = (typeof ShipFactions)[keyof typeof ShipFactions];
 
 /** Render order inside the Phaser scene. */
 export const Depths = {
@@ -53,6 +62,22 @@ export const Gameplay = {
   asteroidSpawnMs: 900,
   asteroidMaxCount: 18,
   scorePerAsteroid: 10,
+
+  // Capital ship (issue #2) — heavier, slower, turret-armed.
+  capitalMaxIntegrity: 100,
+  capitalAsteroidDamage: 10,
+  capitalInvulnerableMs: 600,
+  capitalMass: 40,
+  capitalThrust: 160,
+  capitalMaxSpeed: 220,
+  capitalDrag: 0.6,
+  capitalTurnAccel: 90, // degrees / s²
+  capitalAngularDrag: 0.85,
+  capitalFireCooldownMs: 140,
+  /** World-space rendering scale of the capital ship (the layout is 384×640 px). */
+  capitalScale: 0.75,
+  /** Camera zoom in battle so the ship and its surroundings fit comfortably. */
+  battleZoom: 0.9,
 } as const;
 
 export const StorageKeys = {

@@ -21,7 +21,18 @@ npm run dev      # http://localhost:5173
 
 ## Controls
 
-`W` / `↑` thrust · `A` `D` / `←` `→` rotate · `Space` fire · `Esc` back to menu
+**Battle** — `W` / `↑` thrust · `A` `D` / `←` `→` rotate · mouse aim · `Space` / LMB fire · `Esc` menu
+**Menu** — `Enter` launch · `S` Shipyard viewer
+**Shipyard** — `←` `→` build phase · `Tab` faction skin · `Esc` menu
+
+## The ship
+
+The player flies a **tile-built capital ship** (GitHub issue #2): platform,
+hull, rooms, props, turrets, engines and crew are all assembled from a 64 px
+tile atlas (`public/assets/ships/*.png`, placeholder art). The layout is data
+(`src/config/shipLayout.ts`) and matches the issue's mock-ups pixel-for-pixel —
+open the Shipyard (`S`) to step through the ten build phases. Design details
+live in `public/design/GDD.md`.
 
 ## Architecture
 
@@ -52,28 +63,34 @@ src/
 ├─ main.ts               # boots Phaser + Pixi, wires the EventBus
 ├─ config/
 │  ├─ constants.ts       # scene/texture keys, depths, palette, tuning values
+│  ├─ shipAtlas.ts       # ship atlas tile map (bottom-left origin → frame index)
+│  ├─ shipLayout.ts      # capital-ship layout data (cells, doors, props, items, crew)
 │  └─ gameConfig.ts      # Phaser.Types.Core.GameConfig (arcade physics, no gravity)
 ├─ core/
 │  ├─ EventBus.ts        # typed cross-engine messaging
 │  └─ Registry.ts        # typed global state + localStorage high score
 ├─ scenes/
 │  ├─ BootScene.ts       # engine setup, focus/blur pause
-│  ├─ PreloadScene.ts    # loading bar + procedural texture generation
+│  ├─ PreloadScene.ts    # loading bar, ship atlases, procedural textures
 │  ├─ MainMenuScene.ts   # title screen
-│  └─ BattleScene.ts     # gameplay: ship, bullets, asteroids, scoring
+│  ├─ BattleScene.ts     # gameplay: capital ship, camera follow, asteroids, scoring
+│  └─ ShipyardScene.ts   # static viewer: 10 build phases, faction swap
 ├─ entities/
-│  ├─ Ship.ts            # Arcade.Sprite: inertia, steering, shields
-│  └─ Bullet.ts          # pooled Arcade.Image projectile
+│  ├─ Spaceship.ts       # tile-built capital ship: render + physics + turrets
+│  └─ Bullet.ts          # pooled Arcade projectile
 ├─ pixi/
 │  ├─ PixiOverlay.ts     # Pixi Application lifecycle + resize sync
-│  └─ layers/HudLayer.ts # score, shields, FPS, centre messages
+│  └─ layers/HudLayer.ts # score, hull bar, FPS, centre messages
 └─ utils/math.ts         # engine-agnostic helpers (unit tested)
 ```
 
 ### Notes
 
-- **No binary assets required.** All textures are generated at runtime in
-  `PreloadScene`; see `public/assets/README.md` to switch to real files.
+- **Assets.** The two ship tile atlases in `public/assets/ships/` are loaded as
+  64 px spritesheets; everything else (bullets, asteroids, stars) is generated
+  at runtime in `PreloadScene`.
+- **Screenshots.** `node scripts/screenshot.mjs <url> <outDir> [final|phases]`
+  drives the game headlessly with Playwright (`npx playwright install chromium`).
 - **Physics:** Arcade (simple AABB/circle, top-down, zero gravity). Set
   `VITE_PHYSICS_DEBUG=true` in a `.env.local` file to draw physics bodies in dev.
 - **Path alias:** `@/*` → `src/*` (configured in both `tsconfig.json` and

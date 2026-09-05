@@ -61,7 +61,7 @@ export class MainMenuScene extends Phaser.Scene {
       .text(
         width / 2,
         height * 0.74,
-        'W / ↑ thrust    A D / ← → rotate    SPACE fire    ESC menu',
+        'W / ↑ thrust    A D / ← → rotate    MOUSE aim    SPACE / LMB fire    ESC menu',
         {
           fontFamily: 'Segoe UI, system-ui, sans-serif',
           fontSize: '14px',
@@ -69,6 +69,14 @@ export class MainMenuScene extends Phaser.Scene {
           align: 'center',
         },
       )
+      .setOrigin(0.5);
+
+    this.add
+      .text(width / 2, height * 0.78, 'PRESS S FOR SHIPYARD VIEWER', {
+        fontFamily: 'Segoe UI, system-ui, sans-serif',
+        fontSize: '13px',
+        color: '#6ef2ff',
+      })
       .setOrigin(0.5);
 
     const highScore = getState(this, 'highScore');
@@ -90,6 +98,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.startGame());
     this.input.keyboard?.once('keydown-ENTER', () => this.startGame());
     this.input.keyboard?.once('keydown-SPACE', () => this.startGame());
+    this.input.keyboard?.once('keydown-S', () => this.scene.start(SceneKeys.Shipyard));
 
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

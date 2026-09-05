@@ -42,10 +42,15 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
       return;
     }
 
-    // Cull anything that leaves the viewport.
-    const { width, height } = this.scene.scale;
-    const pad = 48;
-    if (this.x < -pad || this.x > width + pad || this.y < -pad || this.y > height + pad) {
+    // Cull anything that leaves the camera's world view.
+    const view = this.scene.cameras.main.worldView;
+    const pad = 96;
+    if (
+      this.x < view.left - pad ||
+      this.x > view.right + pad ||
+      this.y < view.top - pad ||
+      this.y > view.bottom + pad
+    ) {
       this.deactivate();
     }
   }

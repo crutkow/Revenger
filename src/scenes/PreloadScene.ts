@@ -1,14 +1,11 @@
 import Phaser from 'phaser';
 import { Palette, SceneKeys, TextureKeys } from '@/config/constants';
+import { ATLAS_TILE } from '@/config/shipAtlas';
 
 /**
- * Asset stage. This boilerplate ships zero binary assets — every texture is
- * generated at runtime so `npm run dev` works on a clean checkout.
- *
- * To load real files instead, drop them in `public/assets/` and use:
- *   this.load.setBaseURL('assets/');
- *   this.load.image(TextureKeys.Ship, 'ships/interceptor.png');
- *   this.load.atlas('fx', 'fx/fx.png', 'fx/fx.json');
+ * Asset stage. Most textures are generated at runtime so `npm run dev` works
+ * on a clean checkout; the two spaceship tile atlases are real files loaded
+ * as spritesheets (64×64 frames) — see `src/config/shipAtlas.ts`.
  */
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -17,11 +14,19 @@ export class PreloadScene extends Phaser.Scene {
 
   preload(): void {
     this.createProgressBar();
-    // Real loader calls go here.
+
+    this.load.setBaseURL('assets/');
+    this.load.spritesheet(TextureKeys.ShipAtlasGse, 'ships/gse_atlas.png', {
+      frameWidth: ATLAS_TILE,
+      frameHeight: ATLAS_TILE,
+    });
+    this.load.spritesheet(TextureKeys.ShipAtlasPoer, 'ships/poer_atlas.png', {
+      frameWidth: ATLAS_TILE,
+      frameHeight: ATLAS_TILE,
+    });
   }
 
   create(): void {
-    this.generateShipTexture();
     this.generateBulletTexture();
     this.generateAsteroidTexture();
     this.generateParticleTexture();
@@ -48,27 +53,6 @@ export class PreloadScene extends Phaser.Scene {
       fill.destroy();
       frame.destroy();
     });
-  }
-
-  /** Arrow-head hull pointing along +X (so `angle` == thrust direction). */
-  private generateShipTexture(): void {
-    const size = 40;
-    const g = this.add.graphics();
-
-    g.fillStyle(Palette.Hull, 1);
-    g.beginPath();
-    g.moveTo(size, size / 2);
-    g.lineTo(4, 6);
-    g.lineTo(14, size / 2);
-    g.lineTo(4, size - 6);
-    g.closePath();
-    g.fillPath();
-
-    g.fillStyle(Palette.Hud, 1);
-    g.fillCircle(20, size / 2, 3.5);
-
-    g.generateTexture(TextureKeys.Ship, size, size);
-    g.destroy();
   }
 
   private generateBulletTexture(): void {
