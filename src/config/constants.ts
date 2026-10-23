@@ -10,15 +10,42 @@ export const SceneKeys = {
 } as const;
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];
 
-/** Textures are generated procedurally in PreloadScene, so no binary assets are required. */
+/**
+ * Atlas textures are loaded from `public/assets/ships/`; the starfield and
+ * particle textures are still generated procedurally in PreloadScene.
+ */
 export const TextureKeys = {
-  Ship: 'tex-ship',
-  Bullet: 'tex-bullet',
-  Asteroid: 'tex-asteroid',
+  /** Ship parts atlas (`poer_atlas.png`). */
+  PoerAtlas: 'atlas-poer',
+  /** Ship, bullet and asteroid sprites (`space_atlas.png`). */
+  SpaceAtlas: 'atlas-space',
   Starfield: 'tex-starfield',
   Particle: 'tex-particle',
 } as const;
 export type TextureKey = (typeof TextureKeys)[keyof typeof TextureKeys];
+
+/** Keys for non-texture loaded assets. */
+export const AssetKeys = {
+  PoerAtlasDescriptor: 'desc-atlas-poer',
+  SpaceAtlasDescriptor: 'desc-atlas-space',
+} as const;
+
+/** Frame names in `space_atlas.json`. */
+export const SpaceFrames = {
+  Ship: 'ship-small',
+  Bullet: 'ship-bullet',
+  AsteroidBig: 'asteroid-big',
+  AsteroidMedium: 'asteroid-medium',
+  AsteroidSmall: 'asteroid-small',
+} as const;
+export type SpaceFrame = (typeof SpaceFrames)[keyof typeof SpaceFrames];
+
+/**
+ * Heading (math angle, 0 = +X, clockwise on screen) that a sprite faces when its
+ * `angle` is 0. The atlas sprites are drawn nose-up, i.e. facing -90°.
+ * sprite.angle = heading - SPRITE_FACING_DEG, so change this if art is redrawn.
+ */
+export const SPRITE_FACING_DEG = -90;
 
 /** Render order inside the Phaser scene. */
 export const Depths = {

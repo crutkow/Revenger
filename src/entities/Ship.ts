@@ -1,27 +1,27 @@
 import Phaser from 'phaser';
-import { Gameplay, TextureKeys } from '@/config/constants';
+import { Gameplay, SPRITE_FACING_DEG, SpaceFrames, TextureKeys } from '@/config/constants';
 
 export type TurnDirection = -1 | 0 | 1;
 
 /**
  * Player ship: arcade-physics body with inertia + angular steering.
- * Texture points along +X, so `angle` is also the thrust direction.
+ * The sprite is drawn nose-up, so thrust follows `heading` (= angle + SPRITE_FACING_DEG).
  */
 export class Ship extends Phaser.Physics.Arcade.Sprite {
-  shields = Gameplay.playerStartShields;
-  readonly maxShields = Gameplay.playerStartShields;
+  shields: number = Gameplay.playerStartShields;
+  readonly maxShields: number = Gameplay.playerStartShields;
 
   private invulnerableUntil = 0;
   private lastFiredAt = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    super(scene, x, y, TextureKeys.Ship);
+    super(scene, x, y, TextureKeys.SpaceAtlas, SpaceFrames.Ship);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
     this.setOrigin(0.5)
-      .setAngle(-90) // nose up on spawn
+      .setAngle(0) // nose up on spawn
       .setDamping(true)
       .setDrag(Gameplay.playerDrag)
       .setMaxVelocity(Gameplay.playerMaxSpeed)
@@ -34,12 +34,17 @@ export class Ship extends Phaser.Physics.Arcade.Sprite {
     return this.scene.time.now < this.invulnerableUntil;
   }
 
+  /** Direction the nose points, as a math angle in degrees (0 = +X). */
+  get heading(): number {
+    return this.angle + SPRITE_FACING_DEG;
+  }
+
   applyThrust(active: boolean): void {
     if (!active) {
       this.setAcceleration(0, 0);
       return;
     }
-    const rad = Phaser.Math.DegToRad(this.angle);
+    const rad = Phaser.Math.DegToRad(this.heading);
     this.setAcceleration(
       Math.cos(rad) * Gameplay.playerThrust,
       Math.sin(rad) * Gameplay.playerThrust,
@@ -61,8 +66,8 @@ export class Ship extends Phaser.Physics.Arcade.Sprite {
 
   /** Muzzle position in world space. */
   getMuzzlePosition(): Phaser.Math.Vector2 {
-    const rad = Phaser.Math.DegToRad(this.angle);
-    const offset = this.width * 0.55;
+    const rad = Phaser.Math.DegToRad(this.heading);
+    const offset = this.height * 0.55;
     return new Phaser.Math.Vector2(
       this.x + Math.cos(rad) * offset,
       this.y + Math.sin(rad) * offset,
@@ -93,7 +98,7 @@ export class Ship extends Phaser.Physics.Arcade.Sprite {
     this.shields = this.maxShields;
     this.invulnerableUntil = 0;
     this.lastFiredAt = 0;
-    this.setPosition(x, y).setAngle(-90).setAlpha(1);
+    this.setPosition(x, y).setAngle(0).setAlpha(1);
     this.setVelocity(0, 0);
     this.setAcceleration(0, 0);
     this.setAngularVelocity(0);

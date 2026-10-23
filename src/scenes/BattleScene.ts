@@ -1,5 +1,12 @@
 import Phaser from 'phaser';
-import { Depths, Gameplay, Palette, SceneKeys, TextureKeys } from '@/config/constants';
+import {
+  Depths,
+  Gameplay,
+  Palette,
+  SceneKeys,
+  SpaceFrames,
+  TextureKeys,
+} from '@/config/constants';
 import { EventBus } from '@/core/EventBus';
 import { commitHighScore, setState } from '@/core/Registry';
 import { Bullet } from '@/entities/Bullet';
@@ -8,6 +15,13 @@ import { randomPointOutsideRect, randomRange } from '@/utils/math';
 
 /** Asteroids are plain physics sprites — no custom class needed. */
 type Asteroid = Phaser.Physics.Arcade.Sprite;
+
+/** Asteroid sizes available in the atlas. Bigger rocks drift slower and explode bigger. */
+const ASTEROID_VARIANTS = [
+  { frame: SpaceFrames.AsteroidBig, speedFactor: 0.7, explosionScale: 1.3 },
+  { frame: SpaceFrames.AsteroidMedium, speedFactor: 1, explosionScale: 1 },
+  { frame: SpaceFrames.AsteroidSmall, speedFactor: 1.5, explosionScale: 0.65 },
+] as const;
 
 interface InputKeys {
   thrust: Phaser.Input.Keyboard.Key[];
@@ -142,7 +156,7 @@ export class BattleScene extends Phaser.Scene {
 
     const muzzle = this.player.getMuzzlePosition();
     const velocity = this.player.body?.velocity;
-    bullet.fire(muzzle.x, muzzle.y, this.player.angle, velocity?.x ?? 0, velocity?.y ?? 0);
+    bullet.fire(muzzle.x, muzzle.y, this.player.heading, velocity?.x ?? 0, velocity?.y ?? 0);
   }
 
   private spawnAsteroid(): void {
@@ -152,18 +166,23 @@ export class BattleScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const spawn = randomPointOutsideRect(width, height, 80);
 
-    const asteroid = this.asteroids.create(spawn.x, spawn.y, TextureKeys.Asteroid) as Asteroid;
+    const variant = Phaser.Utils.Array.GetRandom([...ASTEROID_VARIANTS]);
+    const asteroid = this.asteroids.create(
+      spawn.x,
+      spawn.y,
+      TextureKeys.SpaceAtlas,
+      variant.frame,
+    ) as Asteroid;
 
-    const scale = randomRange(0.5, 1.3);
     asteroid
       .setDepth(Depths.Asteroids)
-      .setScale(scale)
+      .setData('explosionScale', variant.explosionScale)
       .setAngularVelocity(randomRange(-60, 60));
     asteroid.setCircle(asteroid.width * 0.42, asteroid.width * 0.08, asteroid.height * 0.08);
 
     // Aim loosely at the player so the action stays on-screen.
     const angle = Phaser.Math.Angle.Between(spawn.x, spawn.y, this.player.x, this.player.y);
-    const speed = randomRange(50, 130) / scale;
+    const speed = randomRange(50, 130) * variant.speedFactor;
     asteroid.setVelocity(
       Math.cos(angle) * speed + randomRange(-25, 25),
       Math.sin(angle) * speed + randomRange(-25, 25),
@@ -174,7 +193,7 @@ export class BattleScene extends Phaser.Scene {
     if (!bullet.active || !asteroid.active) return;
 
     bullet.deactivate();
-    this.spawnExplosion(asteroid.x, asteroid.y, asteroid.scale);
+    this.spawnExplosion(asteroid.x, asteroid.y, this.explosionScaleOf(asteroid));
     asteroid.destroy();
 
     this.score += Gameplay.scorePerAsteroid;
@@ -185,7 +204,7 @@ export class BattleScene extends Phaser.Scene {
     const player = this.player;
     if (this.isGameOver || player.isInvulnerable || !asteroid.active) return;
 
-    this.spawnExplosion(asteroid.x, asteroid.y, asteroid.scale);
+    this.spawnExplosion(asteroid.x, asteroid.y, this.explosionScaleOf(asteroid));
     asteroid.destroy();
 
     if (!player.takeDamage()) return;
@@ -196,6 +215,10 @@ export class BattleScene extends Phaser.Scene {
     } else {
       EventBus.emit('hud:message', 'HULL BREACH', 900);
     }
+  }
+
+  private explosionScaleOf(asteroid: Asteroid): number {
+    return (asteroid.getData('explosionScale') as number | undefined) ?? 1;
   }
 
   private spawnExplosion(x: number, y: number, scale: number): void {

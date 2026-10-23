@@ -1,0 +1,13 @@
+{
+  "image": "space_atlas.png",
+  "tileSize": 64,
+  "columns": 16,
+  "rows": 16,
+  "items": [
+    { "name": "asteroid-big", "x": 0, "y": 0, "w": 64, "h": 64 },
+    { "name": "asteroid-medium", "x": 1, "y": 0, "w": 48, "h": 48 },
+    { "name": "asteroid-small", "x": 2, "y": 0, "w": 32, "h": 32 },
+    { "name": "ship-small", "x": 0, "y": 1, "w": 64, "h": 64 },
+    { "name": "ship-bullet", "x": 1, "y": 1, "w": 20, "h": 20 }
+  ]
+}

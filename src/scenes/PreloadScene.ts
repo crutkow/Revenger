@@ -1,13 +1,29 @@
 import Phaser from 'phaser';
-import { Palette, SceneKeys, TextureKeys } from '@/config/constants';
+import { registerAtlasFrames } from '@/atlas/AtlasRegistry';
+import type { AtlasDescriptor } from '@/atlas/atlasTypes';
+import { AssetKeys, Palette, SceneKeys, TextureKeys } from '@/config/constants';
+
+/** Atlases in `public/assets/ships/`: image + tile-based descriptor, split into named frames. */
+const ATLASES = [
+  {
+    texture: TextureKeys.PoerAtlas,
+    image: 'ships/poer_atlas.png',
+    descriptorKey: AssetKeys.PoerAtlasDescriptor,
+    descriptor: 'ships/poer_atlas.json',
+  },
+  {
+    texture: TextureKeys.SpaceAtlas,
+    image: 'ships/space_atlas.png',
+    descriptorKey: AssetKeys.SpaceAtlasDescriptor,
+    descriptor: 'ships/space_atlas.json',
+  },
+] as const;
 
 /**
- * Asset stage. This boilerplate ships zero binary assets — every texture is
- * generated at runtime so `npm run dev` works on a clean checkout.
+ * Asset stage. Ship, bullet and asteroid art comes from the atlases above. The
+ * starfield and particle textures are still generated at runtime.
  *
- * To load real files instead, drop them in `public/assets/` and use:
- *   this.load.setBaseURL('assets/');
- *   this.load.image(TextureKeys.Ship, 'ships/interceptor.png');
+ * More real files can be added in `preload()`:
  *   this.load.atlas('fx', 'fx/fx.png', 'fx/fx.json');
  */
 export class PreloadScene extends Phaser.Scene {
@@ -17,13 +33,22 @@ export class PreloadScene extends Phaser.Scene {
 
   preload(): void {
     this.createProgressBar();
-    // Real loader calls go here.
+
+    this.load.setBaseURL('assets/');
+    for (const atlas of ATLASES) {
+      this.load.image(atlas.texture, atlas.image);
+      this.load.json(atlas.descriptorKey, atlas.descriptor);
+    }
   }
 
   create(): void {
-    this.generateShipTexture();
-    this.generateBulletTexture();
-    this.generateAsteroidTexture();
+    for (const atlas of ATLASES) {
+      const descriptor = this.cache.json.get(atlas.descriptorKey) as AtlasDescriptor;
+      registerAtlasFrames(this, atlas.texture, descriptor);
+      // Pixel art: keep edges crisp when sprites are rotated or scaled.
+      this.textures.get(atlas.texture).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
+
     this.generateParticleTexture();
     this.generateStarfieldTexture();
 
@@ -48,56 +73,6 @@ export class PreloadScene extends Phaser.Scene {
       fill.destroy();
       frame.destroy();
     });
-  }
-
-  /** Arrow-head hull pointing along +X (so `angle` == thrust direction). */
-  private generateShipTexture(): void {
-    const size = 40;
-    const g = this.add.graphics();
-
-    g.fillStyle(Palette.Hull, 1);
-    g.beginPath();
-    g.moveTo(size, size / 2);
-    g.lineTo(4, 6);
-    g.lineTo(14, size / 2);
-    g.lineTo(4, size - 6);
-    g.closePath();
-    g.fillPath();
-
-    g.fillStyle(Palette.Hud, 1);
-    g.fillCircle(20, size / 2, 3.5);
-
-    g.generateTexture(TextureKeys.Ship, size, size);
-    g.destroy();
-  }
-
-  private generateBulletTexture(): void {
-    const g = this.add.graphics();
-    g.fillStyle(Palette.Bullet, 1).fillRect(0, 2, 14, 3);
-    g.fillStyle(0xffffff, 1).fillRect(10, 2, 4, 3);
-    g.generateTexture(TextureKeys.Bullet, 14, 7);
-    g.destroy();
-  }
-
-  private generateAsteroidTexture(): void {
-    const size = 48;
-    const radius = size / 2 - 2;
-    const points: Phaser.Math.Vector2[] = [];
-    const steps = 11;
-
-    for (let i = 0; i < steps; i += 1) {
-      const angle = (i / steps) * Math.PI * 2;
-      const r = radius * Phaser.Math.FloatBetween(0.72, 1);
-      points.push(
-        new Phaser.Math.Vector2(size / 2 + Math.cos(angle) * r, size / 2 + Math.sin(angle) * r),
-      );
-    }
-
-    const g = this.add.graphics();
-    g.fillStyle(Palette.Asteroid, 1).fillPoints(points, true, true);
-    g.lineStyle(1.5, 0xffffff, 0.18).strokePoints(points, true, true);
-    g.generateTexture(TextureKeys.Asteroid, size, size);
-    g.destroy();
   }
 
   private generateParticleTexture(): void {

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Depths, Gameplay, TextureKeys } from '@/config/constants';
+import { Depths, Gameplay, SPRITE_FACING_DEG, SpaceFrames, TextureKeys } from '@/config/constants';
 
 /**
  * Pooled projectile, created through a physics group with `classType: Bullet`.
@@ -12,16 +12,17 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
   private lifespanMs = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    super(scene, x, y, TextureKeys.Bullet);
+    super(scene, x, y, TextureKeys.SpaceAtlas, SpaceFrames.Bullet);
     this.setDepth(Depths.Bullets);
   }
 
-  fire(x: number, y: number, angleDeg: number, inheritVx = 0, inheritVy = 0): void {
+  /** `headingDeg` is a math angle (0 = +X); the nose-up sprite is rotated to match. */
+  fire(x: number, y: number, headingDeg: number, inheritVx = 0, inheritVy = 0): void {
     this.enableBody(true, x, y, true, true);
-    this.setAngle(angleDeg);
+    this.setAngle(headingDeg - SPRITE_FACING_DEG);
     this.lifespanMs = Gameplay.bulletLifespanMs;
 
-    const rad = Phaser.Math.DegToRad(angleDeg);
+    const rad = Phaser.Math.DegToRad(headingDeg);
     this.setVelocity(
       Math.cos(rad) * Gameplay.bulletSpeed + inheritVx * 0.35,
       Math.sin(rad) * Gameplay.bulletSpeed + inheritVy * 0.35,
