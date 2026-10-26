@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  AssetKeys,
   Depths,
   Gameplay,
   Palette,
@@ -10,7 +11,8 @@ import {
 import { EventBus } from '@/core/EventBus';
 import { commitHighScore, setState } from '@/core/Registry';
 import { Bullet } from '@/entities/Bullet';
-import { Ship } from '@/entities/Ship';
+import { Spaceship } from '@/entities/Spaceship';
+import type { SpaceshipBlueprint } from '@/spaceship/blueprintTypes';
 import { randomPointOutsideRect, randomRange } from '@/utils/math';
 
 /** Asteroids are plain physics sprites — no custom class needed. */
@@ -31,7 +33,7 @@ interface InputKeys {
 }
 
 export class BattleScene extends Phaser.Scene {
-  private player!: Ship;
+  private player!: Spaceship;
   private bullets!: Phaser.Physics.Arcade.Group;
   private asteroids!: Phaser.Physics.Arcade.Group;
   private starfieldFar!: Phaser.GameObjects.TileSprite;
@@ -54,7 +56,8 @@ export class BattleScene extends Phaser.Scene {
 
     this.createBackground(width, height);
 
-    this.player = new Ship(this, width / 2, height / 2);
+    const blueprint = this.cache.json.get(AssetKeys.PlayerSpaceship) as SpaceshipBlueprint;
+    this.player = new Spaceship(this, width / 2, height / 2, blueprint);
     this.player.setDepth(Depths.Player);
 
     this.bullets = this.physics.add.group({ classType: Bullet, maxSize: 48 });
@@ -108,7 +111,7 @@ export class BattleScene extends Phaser.Scene {
     if (isDown(this.keys.fire)) this.fire();
 
     // Toroidal playfield: leaving one edge re-enters on the opposite side.
-    this.physics.world.wrap(this.player, this.player.width * 0.5);
+    this.physics.world.wrap(this.player, this.player.displayWidth * 0.5);
     this.physics.world.wrap(this.asteroids, 64);
   }
 
@@ -151,12 +154,12 @@ export class BattleScene extends Phaser.Scene {
   private fire(): void {
     if (!this.player.canFire()) return;
 
-    const bullet = this.bullets.get(0, 0) as Bullet | null;
-    if (!bullet) return;
-
-    const muzzle = this.player.getMuzzlePosition();
     const velocity = this.player.body?.velocity;
-    bullet.fire(muzzle.x, muzzle.y, this.player.heading, velocity?.x ?? 0, velocity?.y ?? 0);
+    for (const muzzle of this.player.getMuzzlePositions()) {
+      const bullet = this.bullets.get(0, 0) as Bullet | null;
+      if (!bullet) return;
+      bullet.fire(muzzle.x, muzzle.y, this.player.heading, velocity?.x ?? 0, velocity?.y ?? 0);
+    }
   }
 
   private spawnAsteroid(): void {

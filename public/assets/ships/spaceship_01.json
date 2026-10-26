@@ -1,0 +1,54 @@
+{
+  "name": "spaceship_01",
+  "platform": [
+    { "x": 8, "y": 0 },
+    { "x": 12, "y": 0 },
+
+    { "x": 6, "y": 4 },
+    { "x": 10, "y": 4 },
+    { "x": 14, "y": 4 },
+
+    { "x": 0, "y": 8 },
+    { "x": 4, "y": 8 },
+    { "x": 8, "y": 8 },
+    { "x": 12, "y": 8 },
+    { "x": 16, "y": 8 },
+    { "x": 20, "y": 8 },
+
+    { "x": 6, "y": 12 },
+    { "x": 10, "y": 12 },
+    { "x": 14, "y": 12 }
+  ],
+  "hull": [
+    { "x": 6, "y": 4, "w": 12, "h": 4 },
+    { "x": 4, "y": 8, "w": 16, "h": 4 },
+    { "x": 10, "y": 12, "w": 4, "h": 4 }
+  ],
+  "walls": [
+    { "x1": 6, "y1": 8, "x2": 18, "y2": 8 },
+    { "x1": 10, "y1": 12, "x2": 14, "y2": 12 }
+  ],
+  "doors": [
+    { "x": 11, "y": 8, "dir": "h" },
+    { "x": 11, "y": 12, "dir": "h" }
+  ],
+  "items": [
+    { "type": "cannon", "tile": { "x": 8, "y": 0 } },
+    { "type": "cannon", "tile": { "x": 12, "y": 0 } },
+
+    { "type": "bridge-console-left", "tile": { "x": 6, "y": 4 } },
+    { "type": "bridge-seat", "tile": { "x": 10, "y": 4 } },
+    { "type": "bridge-monitor", "tile": { "x": 10, "y": 4 } },
+    { "type": "bridge-console-right", "tile": { "x": 14, "y": 4 } },
+
+    { "type": "thruster-left", "tile": { "x": 0, "y": 8 } },
+    { "type": "bed", "tile": { "x": 4, "y": 8 } },
+    { "type": "messhall-dining", "tile": { "x": 12, "y": 8 } },
+    { "type": "messhall-table", "tile": { "x": 16, "y": 8 } },
+    { "type": "thruster-right", "tile": { "x": 20, "y": 8 } },
+
+    { "type": "thruster-main", "tile": { "x": 6, "y": 12 } },
+    { "type": "engine-room", "tile": { "x": 10, "y": 12 } },
+    { "type": "thruster-main", "tile": { "x": 14, "y": 12 } }
+  ]
+}

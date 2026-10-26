@@ -28,6 +28,8 @@ export type TextureKey = (typeof TextureKeys)[keyof typeof TextureKeys];
 export const AssetKeys = {
   PoerAtlasDescriptor: 'desc-atlas-poer',
   SpaceAtlasDescriptor: 'desc-atlas-space',
+  /** Player spaceship blueprint (`ships/spaceship_01.json`). */
+  PlayerSpaceship: 'blueprint-spaceship-01',
 } as const;
 
 /** Frame names in `space_atlas.json`. */
@@ -72,6 +74,8 @@ export const Gameplay = {
   playerThrust: 420,
   playerTurnRate: 220, // degrees / second
   playerDrag: 0.55,
+  /** Display scale of the blueprint-built spaceship (1 = atlas pixels). */
+  spaceshipScale: 0.5,
   playerStartShields: 3,
   playerInvulnerableMs: 1500,
   bulletSpeed: 620,

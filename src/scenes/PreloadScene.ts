@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { registerAtlasFrames } from '@/atlas/AtlasRegistry';
 import type { AtlasDescriptor } from '@/atlas/atlasTypes';
 import { AssetKeys, Palette, SceneKeys, TextureKeys } from '@/config/constants';
+import { poerFrameSize } from '@/entities/Spaceship';
+import type { SpaceshipBlueprint } from '@/spaceship/blueprintTypes';
+import { buildSpaceshipLayout } from '@/spaceship/spaceshipBuilder';
 
 /** Atlases in `public/assets/ships/`: image + tile-based descriptor, split into named frames. */
 const ATLASES = [
@@ -39,6 +42,7 @@ export class PreloadScene extends Phaser.Scene {
       this.load.image(atlas.texture, atlas.image);
       this.load.json(atlas.descriptorKey, atlas.descriptor);
     }
+    this.load.json(AssetKeys.PlayerSpaceship, 'ships/spaceship_01.json');
   }
 
   create(): void {
@@ -48,6 +52,12 @@ export class PreloadScene extends Phaser.Scene {
       // Pixel art: keep edges crisp when sprites are rotated or scaled.
       this.textures.get(atlas.texture).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
+
+    // Fail early (like a bad atlas) if the blueprint breaks a build rule.
+    buildSpaceshipLayout(
+      this.cache.json.get(AssetKeys.PlayerSpaceship) as SpaceshipBlueprint,
+      poerFrameSize,
+    );
 
     this.generateParticleTexture();
     this.generateStarfieldTexture();
