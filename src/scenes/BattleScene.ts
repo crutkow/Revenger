@@ -1,29 +1,30 @@
 import Phaser from 'phaser';
-import {
-  AssetKeys,
-  Depths,
-  Gameplay,
-  Palette,
-  SceneKeys,
-  SpaceFrames,
-  TextureKeys,
-} from '@/config/constants';
+import { AssetKeys, Depths, Gameplay, Palette, SceneKeys, TextureKeys } from '@/config/constants';
 import { EventBus } from '@/core/EventBus';
 import { commitHighScore, setState } from '@/core/Registry';
 import { Bullet } from '@/entities/Bullet';
 import { Spaceship } from '@/entities/Spaceship';
 import type { SpaceshipBlueprint } from '@/spaceship/blueprintTypes';
-import { randomPointOutsideRect, randomRange } from '@/utils/math';
+import {
+  ASTEROID_TIERS,
+  ASTEROID_TIER_NAMES,
+  splitChildren,
+  type AsteroidTier,
+} from '@/utils/asteroids';
+import {
+  compassHeadingDeg,
+  farthestCornerDistance,
+  randomPointOnRing,
+  randomRange,
+  worldToDisplayY,
+} from '@/utils/math';
 
 /** Asteroids are plain physics sprites — no custom class needed. */
 type Asteroid = Phaser.Physics.Arcade.Sprite;
 
-/** Asteroid sizes available in the atlas. Bigger rocks drift slower and explode bigger. */
-const ASTEROID_VARIANTS = [
-  { frame: SpaceFrames.AsteroidBig, speedFactor: 0.7, explosionScale: 1.3 },
-  { frame: SpaceFrames.AsteroidMedium, speedFactor: 1, explosionScale: 1 },
-  { frame: SpaceFrames.AsteroidSmall, speedFactor: 1.5, explosionScale: 0.65 },
-] as const;
+const ASTEROID_TIER_KEY = 'tier';
+/** Initial asteroids never appear closer than this to the ship (world units). */
+const INITIAL_ASTEROID_MIN_DISTANCE = 700;
 
 interface InputKeys {
   thrust: Phaser.Input.Keyboard.Key[];
@@ -48,20 +49,21 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create(): void {
-    const { width, height } = this.scale;
-
     this.score = 0;
     this.isGameOver = false;
     this.cameras.main.fadeIn(240, 0, 0, 0);
 
-    this.createBackground(width, height);
+    this.createBackground();
+    this.createOriginMarker();
 
+    // The ship spawns at the centre of the world map, (0, 0).
     const blueprint = this.cache.json.get(AssetKeys.PlayerSpaceship) as SpaceshipBlueprint;
-    this.player = new Spaceship(this, width / 2, height / 2, blueprint);
+    this.player = new Spaceship(this, 0, 0, blueprint);
     this.player.setDepth(Depths.Player);
 
     this.bullets = this.physics.add.group({ classType: Bullet, maxSize: 48 });
-    this.asteroids = this.physics.add.group({ maxSize: Gameplay.asteroidMaxCount });
+    // No maxSize: split children must always fit. Timed spawns check the cap themselves.
+    this.asteroids = this.physics.add.group();
 
     this.physics.add.overlap(this.bullets, this.asteroids, (bulletObj, asteroidObj) => {
       this.handleBulletHitAsteroid(bulletObj as Bullet, asteroidObj as Asteroid);
@@ -78,28 +80,21 @@ export class BattleScene extends Phaser.Scene {
       callback: this.spawnAsteroid,
       callbackScope: this,
     });
-    for (let i = 0; i < 4; i += 1) this.spawnAsteroid();
+    for (let i = 0; i < 4; i += 1) this.spawnAsteroid(true);
 
     this.publishScore();
     this.publishShields();
     EventBus.emit('hud:message', 'ENGAGE', 1200);
 
+    this.applyCameraView();
+    this.layoutStarfield();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize, this);
+    // Runs after Arcade's own POST_UPDATE, so the ship transform is already synced.
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.syncCamera, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown, this);
   }
 
-  override update(_time: number, delta: number): void {
-    const dt = delta / 1000;
-    const velocity = this.player.body?.velocity;
-    const vx = velocity?.x ?? 0;
-    const vy = velocity?.y ?? 0;
-
-    // Parallax: the two star layers drift at different rates.
-    this.starfieldFar.tilePositionX += vx * dt * 0.02;
-    this.starfieldFar.tilePositionY += vy * dt * 0.02;
-    this.starfieldNear.tilePositionX += vx * dt * 0.06;
-    this.starfieldNear.tilePositionY += vy * dt * 0.06;
-
+  override update(): void {
     if (this.isGameOver) return;
 
     const isDown = (keys: Phaser.Input.Keyboard.Key[]): boolean => keys.some((key) => key.isDown);
@@ -110,26 +105,112 @@ export class BattleScene extends Phaser.Scene {
 
     if (isDown(this.keys.fire)) this.fire();
 
-    // Toroidal playfield: leaving one edge re-enters on the opposite side.
-    this.physics.world.wrap(this.player, this.player.displayWidth * 0.5);
-    this.physics.world.wrap(this.asteroids, 64);
+    this.despawnFarAsteroids();
   }
 
-  private createBackground(width: number, height: number): void {
+  /** Camera zoom so that `Gameplay.viewHeight` world units fit the screen height. */
+  private get cameraZoom(): number {
+    return this.scale.height / Gameplay.viewHeight;
+  }
+
+  /** Visible world size (unrotated) in world units. */
+  private get viewSize(): { width: number; height: number } {
+    const zoom = this.cameraZoom;
+    return { width: this.scale.width / zoom, height: this.scale.height / zoom };
+  }
+
+  /** Distance from the ship to the farthest point that can ever be on screen. */
+  private get viewRadius(): number {
+    const { width, height } = this.viewSize;
+    return farthestCornerDistance(width, height, 0.5, Gameplay.shipScreenY);
+  }
+
+  private get spawnRadius(): number {
+    return this.viewRadius + Gameplay.asteroidSpawnMargin;
+  }
+
+  private applyCameraView(): void {
+    const camera = this.cameras.main;
+    // The camera pivot (rotation + zoom centre) is where the ship sits on screen.
+    camera.setOrigin(0.5, Gameplay.shipScreenY);
+    camera.setZoom(this.cameraZoom);
+  }
+
+  /**
+   * Pins the camera to the ship: the ship stays at the pivot, the nose always points
+   * up the screen and the world rotates around it.
+   */
+  private syncCamera(): void {
+    const camera = this.cameras.main;
+    camera.setRotation(-this.player.rotation);
+    camera.setScroll(
+      this.player.x - camera.width * camera.originX,
+      this.player.y - camera.height * camera.originY,
+    );
+
+    // Parallax: star layers follow the ship at different rates. They live in the
+    // (rotating) world frame, so their tile offset is simply the scaled ship position.
+    this.starfieldFar.setTilePosition(
+      (this.player.x * Gameplay.starfieldFarParallax) / this.starfieldFar.tileScaleX,
+      (this.player.y * Gameplay.starfieldFarParallax) / this.starfieldFar.tileScaleY,
+    );
+    this.starfieldNear.setTilePosition(
+      (this.player.x * Gameplay.starfieldNearParallax) / this.starfieldNear.tileScaleX,
+      (this.player.y * Gameplay.starfieldNearParallax) / this.starfieldNear.tileScaleY,
+    );
+
+    EventBus.emit(
+      'hud:ship',
+      this.player.x,
+      worldToDisplayY(this.player.y),
+      compassHeadingDeg(this.player.angle),
+    );
+  }
+
+  /**
+   * Star layers are scroll-factor 0 sprites centred on the camera pivot. The camera
+   * matrix rotates/zooms them with the world, so they only need to be big enough to
+   * cover the screen at any rotation.
+   */
+  private createBackground(): void {
     this.starfieldFar = this.add
-      .tileSprite(0, 0, width, height, TextureKeys.Starfield)
-      .setOrigin(0)
+      .tileSprite(0, 0, 16, 16, TextureKeys.Starfield)
+      .setOrigin(0.5)
       .setAlpha(0.35)
       .setScrollFactor(0)
       .setDepth(Depths.StarfieldFar);
 
     this.starfieldNear = this.add
-      .tileSprite(0, 0, width, height, TextureKeys.Starfield)
-      .setOrigin(0)
+      .tileSprite(0, 0, 16, 16, TextureKeys.Starfield)
+      .setOrigin(0.5)
       .setAlpha(0.7)
-      .setScale(1.4)
+      .setTileScale(1.4)
       .setScrollFactor(0)
       .setDepth(Depths.StarfieldNear);
+  }
+
+  private layoutStarfield(): void {
+    const { width, height } = this.scale;
+    const pivotX = width * 0.5;
+    const pivotY = height * Gameplay.shipScreenY;
+    // Largest distance (in screen px) from the pivot to a screen corner.
+    const cover = farthestCornerDistance(width, height, 0.5, Gameplay.shipScreenY);
+    const side = Math.ceil((cover * 2) / this.cameraZoom);
+
+    for (const layer of [this.starfieldFar, this.starfieldNear]) {
+      layer.setPosition(pivotX, pivotY);
+      layer.setSize(side, side);
+    }
+  }
+
+  /** Faint rings and crosshair marking the world centre (0, 0). */
+  private createOriginMarker(): void {
+    const g = this.add.graphics().setDepth(Depths.OriginMarker);
+    g.lineStyle(3, Palette.Hud, 0.3);
+    for (const radius of [150, 400]) g.strokeCircle(0, 0, radius);
+    g.lineStyle(2, Palette.Hud, 0.22);
+    g.lineBetween(-500, 0, 500, 0);
+    g.lineBetween(0, -500, 0, 500);
   }
 
   private bindInput(): void {
@@ -162,34 +243,91 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private spawnAsteroid(): void {
+  /**
+   * Spawns a random-tier asteroid on a ring just outside the view, drifting toward the
+   * ship. `initial` places it closer so the opening screen is not empty.
+   */
+  private spawnAsteroid(initial = false): void {
     if (this.isGameOver) return;
     if (this.asteroids.countActive(true) >= Gameplay.asteroidMaxCount) return;
 
-    const { width, height } = this.scale;
-    const spawn = randomPointOutsideRect(width, height, 80);
+    const ring = this.spawnRadius;
+    const distance = initial ? randomRange(INITIAL_ASTEROID_MIN_DISTANCE, ring) : ring;
+    const spawn = randomPointOnRing(this.player.x, this.player.y, distance);
+    const tier = Phaser.Utils.Array.GetRandom(ASTEROID_TIER_NAMES);
 
-    const variant = Phaser.Utils.Array.GetRandom([...ASTEROID_VARIANTS]);
-    const asteroid = this.asteroids.create(
+    // Aim loosely at the ship so the action finds the player.
+    const angle = Phaser.Math.Angle.Between(spawn.x, spawn.y, this.player.x, this.player.y);
+    const speed =
+      randomRange(Gameplay.asteroidMinSpeed, Gameplay.asteroidMaxSpeed) *
+      ASTEROID_TIERS[tier].speedFactor;
+    this.createAsteroid(
+      tier,
       spawn.x,
       spawn.y,
-      TextureKeys.SpaceAtlas,
-      variant.frame,
-    ) as Asteroid;
-
-    asteroid
-      .setDepth(Depths.Asteroids)
-      .setData('explosionScale', variant.explosionScale)
-      .setAngularVelocity(randomRange(-60, 60));
-    asteroid.setCircle(asteroid.width * 0.42, asteroid.width * 0.08, asteroid.height * 0.08);
-
-    // Aim loosely at the player so the action stays on-screen.
-    const angle = Phaser.Math.Angle.Between(spawn.x, spawn.y, this.player.x, this.player.y);
-    const speed = randomRange(50, 130) * variant.speedFactor;
-    asteroid.setVelocity(
       Math.cos(angle) * speed + randomRange(-25, 25),
       Math.sin(angle) * speed + randomRange(-25, 25),
     );
+  }
+
+  private createAsteroid(
+    tier: AsteroidTier,
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+  ): Asteroid {
+    const info = ASTEROID_TIERS[tier];
+    const asteroid = this.asteroids.create(x, y, TextureKeys.SpaceAtlas, info.frame) as Asteroid;
+
+    asteroid
+      .setDepth(Depths.Asteroids)
+      .setScale(Gameplay.asteroidScale)
+      .setData(ASTEROID_TIER_KEY, tier)
+      .setData('explosionScale', info.explosionScale)
+      .setAngularVelocity(randomRange(-60, 60));
+    // Body radius/offset are in source pixels; Arcade scales them with the sprite.
+    asteroid.setCircle(asteroid.width * 0.42, asteroid.width * 0.08, asteroid.height * 0.08);
+    asteroid.setVelocity(vx, vy);
+    return asteroid;
+  }
+
+  /** Removes asteroids that drifted too far from the ship to ever matter. */
+  private despawnFarAsteroids(): void {
+    const limit = this.spawnRadius * Gameplay.asteroidDespawnFactor;
+    const limitSq = limit * limit;
+    for (const child of [...this.asteroids.getChildren()]) {
+      const asteroid = child as Asteroid;
+      const dx = asteroid.x - this.player.x;
+      const dy = asteroid.y - this.player.y;
+      if (dx * dx + dy * dy > limitSq) asteroid.destroy();
+    }
+  }
+
+  /** Big -> 2 medium, medium -> 2 small, small -> nothing. Children bypass the spawn cap. */
+  private splitAsteroid(asteroid: Asteroid): void {
+    const tier = asteroid.getData(ASTEROID_TIER_KEY) as AsteroidTier | undefined;
+    if (!tier) return;
+
+    const children = splitChildren(tier);
+    if (children.length === 0) return;
+
+    const body = asteroid.body as Phaser.Physics.Arcade.Body;
+    const direction = Math.random() * Math.PI * 2;
+    // Push the children apart in opposite directions so momentum is conserved.
+    const childRadius = (asteroid.displayWidth / 2) * 0.5;
+    children.forEach((childTier, index) => {
+      const sign = index % 2 === 0 ? 1 : -1;
+      const dx = Math.cos(direction) * sign;
+      const dy = Math.sin(direction) * sign;
+      this.createAsteroid(
+        childTier,
+        asteroid.x + dx * childRadius,
+        asteroid.y + dy * childRadius,
+        body.velocity.x + dx * Gameplay.asteroidSplitSpeed,
+        body.velocity.y + dy * Gameplay.asteroidSplitSpeed,
+      );
+    });
   }
 
   private handleBulletHitAsteroid(bullet: Bullet, asteroid: Asteroid): void {
@@ -197,6 +335,7 @@ export class BattleScene extends Phaser.Scene {
 
     bullet.deactivate();
     this.spawnExplosion(asteroid.x, asteroid.y, this.explosionScaleOf(asteroid));
+    this.splitAsteroid(asteroid);
     asteroid.destroy();
 
     this.score += Gameplay.scorePerAsteroid;
@@ -274,13 +413,14 @@ export class BattleScene extends Phaser.Scene {
     EventBus.emit('hud:shields', this.player.shields, this.player.maxShields);
   }
 
-  private handleResize(size: Phaser.Structs.Size): void {
-    this.starfieldFar.setSize(size.width, size.height);
-    this.starfieldNear.setSize(size.width, size.height);
+  private handleResize(): void {
+    this.applyCameraView();
+    this.layoutStarfield();
   }
 
   private handleShutdown(): void {
     this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
+    this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.syncCamera, this);
     this.input.keyboard?.off('keydown-ESC');
     this.spawnTimer?.remove();
   }

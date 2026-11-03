@@ -1,5 +1,52 @@
 import { describe, expect, it } from 'vitest';
-import { clamp, damp, degToRad, lerp, randomInt, wrapAngleDeg } from './math';
+import {
+  clamp,
+  compassHeadingDeg,
+  damp,
+  degToRad,
+  farthestCornerDistance,
+  lerp,
+  randomInt,
+  randomPointOnRing,
+  worldToDisplayY,
+  wrapAngleDeg,
+} from './math';
+
+describe('compassHeadingDeg', () => {
+  it('maps to [0, 360) with 0 = nose up, clockwise', () => {
+    expect(compassHeadingDeg(0)).toBe(0);
+    expect(compassHeadingDeg(90)).toBe(90);
+    expect(compassHeadingDeg(-90)).toBe(270);
+    expect(compassHeadingDeg(360)).toBe(0);
+    expect(compassHeadingDeg(-1)).toBe(359);
+    expect(compassHeadingDeg(725)).toBe(5);
+  });
+});
+
+describe('worldToDisplayY', () => {
+  it('flips the axis so up is positive', () => {
+    expect(worldToDisplayY(100)).toBe(-100);
+    expect(worldToDisplayY(-50)).toBe(50);
+    expect(Object.is(worldToDisplayY(0), 0)).toBe(true);
+  });
+});
+
+describe('randomPointOnRing', () => {
+  it('returns points at the requested radius around the centre', () => {
+    for (let i = 0; i < 20; i += 1) {
+      const p = randomPointOnRing(10, -20, 300);
+      expect(Math.hypot(p.x - 10, p.y + 20)).toBeCloseTo(300, 6);
+    }
+  });
+});
+
+describe('farthestCornerDistance', () => {
+  it('measures from the pivot to the farthest corner', () => {
+    expect(farthestCornerDistance(200, 100, 0.5, 0.5)).toBeCloseTo(Math.hypot(100, 50));
+    // Pivot at 60% height: the farthest edge is the top (60% of the height away).
+    expect(farthestCornerDistance(200, 100, 0.5, 0.6)).toBeCloseTo(Math.hypot(100, 60));
+  });
+});
 
 describe('clamp', () => {
   it('keeps values inside the range', () => {

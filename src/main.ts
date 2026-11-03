@@ -39,6 +39,7 @@ async function bootstrap(): Promise<void> {
   // --- Gameplay -> HUD wiring ---------------------------------------------
   EventBus.on('hud:score', (score) => overlay.hud.setScore(score));
   EventBus.on('hud:shields', (current, max) => overlay.hud.setShields(current, max));
+  EventBus.on('hud:ship', (x, y, headingDeg) => overlay.hud.setShipPose(x, y, headingDeg));
   EventBus.on('hud:message', (text, durationMs) => overlay.hud.setMessage(text, durationMs));
   EventBus.on('hud:clear-message', () => overlay.hud.clearMessage());
 

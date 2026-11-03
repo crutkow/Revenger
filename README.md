@@ -23,6 +23,22 @@ npm run dev      # http://localhost:5173
 
 `W` / `↑` thrust · `A` `D` / `←` `→` rotate · `Space` fire · `Esc` back to menu
 
+## Gameplay rules
+
+- **Borderless world.** Space has no edges. The ship spawns at world `(0, 0)`;
+  the HUD shows its `X` / `Y` (Y up) and heading (`0°` = north, clockwise,
+  `0–359`). A faint marker is drawn at the world centre.
+- **Pinned camera.** The camera follows the ship and counter-rotates so the nose
+  always points up the screen; the world appears to rotate. The ship sits below
+  screen centre (`Gameplay.shipScreenY`).
+- **Breaking asteroids.** Big → 2 medium → 2 small → nothing. Every hit scores.
+  Split children may exceed `asteroidMaxCount`; only timed spawns respect it.
+  Asteroids spawn on a ring outside the view and despawn when far away.
+- **Scale.** The ship is drawn at full size (`spaceshipScale: 1`) and asteroids
+  are scaled up (`asteroidScale: 2`). To see more of the world around a
+  full-size ship, raise `Gameplay.viewHeight` (camera zoom = screen height /
+  `viewHeight`).
+
 ## Architecture
 
 Phaser and Pixi are both full renderers, so they are **not** mixed in one canvas.
@@ -58,22 +74,25 @@ src/
 │  └─ Registry.ts        # typed global state + localStorage high score
 ├─ scenes/
 │  ├─ BootScene.ts       # engine setup, focus/blur pause
-│  ├─ PreloadScene.ts    # loading bar + procedural texture generation
+│  ├─ PreloadScene.ts    # loading bar + atlas loading
 │  ├─ MainMenuScene.ts   # title screen
-│  └─ BattleScene.ts     # gameplay: ship, bullets, asteroids, scoring
+│  └─ BattleScene.ts     # gameplay: world, pinned camera, bullets, asteroids, scoring
 ├─ entities/
-│  ├─ Ship.ts            # Arcade.Sprite: inertia, steering, shields
+│  ├─ Spaceship.ts       # player: blueprint-built container, inertia, steering, shields
+│  ├─ Ship.ts            # legacy single-sprite ship (only TurnDirection is used)
 │  └─ Bullet.ts          # pooled Arcade.Image projectile
 ├─ pixi/
 │  ├─ PixiOverlay.ts     # Pixi Application lifecycle + resize sync
-│  └─ layers/HudLayer.ts # score, shields, FPS, centre messages
-└─ utils/math.ts         # engine-agnostic helpers (unit tested)
+│  └─ layers/HudLayer.ts # score, shields, FPS, ship position/heading, messages
+└─ utils/
+   ├─ math.ts            # engine-agnostic helpers (unit tested)
+   └─ asteroids.ts       # asteroid split rules (unit tested)
 ```
 
 ### Notes
 
-- **No binary assets required.** All textures are generated at runtime in
-  `PreloadScene`; see `public/assets/README.md` to switch to real files.
+- **Assets.** Sprites come from the atlases in `public/assets/ships/`; see
+  `public/assets/README.md`.
 - **Physics:** Arcade (simple AABB/circle, top-down, zero gravity). Set
   `VITE_PHYSICS_DEBUG=true` in a `.env.local` file to draw physics bodies in dev.
 - **Path alias:** `@/*` → `src/*` (configured in both `tsconfig.json` and

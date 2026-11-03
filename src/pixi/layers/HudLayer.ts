@@ -30,6 +30,16 @@ export class HudLayer extends Container {
   private readonly fpsValue = new Text({ text: '60 FPS', style: { ...labelStyle, fontSize: 12 } });
   private readonly shieldLabel = new Text({ text: 'SHIELDS', style: labelStyle });
   private readonly shieldBar = new Graphics();
+  private readonly poseLabel = new Text({ text: 'POSITION', style: labelStyle });
+  private readonly poseValue = new Text({
+    text: 'X 0   Y 0\nHDG 000°',
+    style: {
+      ...valueStyle,
+      fontFamily: 'Consolas, Menlo, monospace',
+      fontSize: 20,
+      align: 'right',
+    },
+  });
   private readonly message = new Text({
     text: '',
     style: { ...valueStyle, fontSize: 24, align: 'center', fill: HUD_COLOR },
@@ -48,14 +58,29 @@ export class HudLayer extends Container {
   constructor() {
     super();
     this.message.anchor.set(0.5);
+    this.poseLabel.anchor.set(1, 1);
+    this.poseValue.anchor.set(1, 1);
     this.addChild(
       this.scoreLabel,
       this.scoreValue,
       this.fpsValue,
       this.shieldLabel,
       this.shieldBar,
+      this.poseLabel,
+      this.poseValue,
       this.message,
     );
+  }
+
+  /** `x`/`y` are world coordinates (Y up); `headingDeg` is 0 = north, clockwise. */
+  setShipPose(x: number, y: number, headingDeg: number): void {
+    const heading = Math.round(headingDeg) % 360;
+    const text = `X ${Math.round(x)}   Y ${Math.round(y)}\nHDG ${heading
+      .toString()
+      .padStart(3, '0')}°`;
+    if (this.poseValue.text !== text) {
+      this.poseValue.text = text;
+    }
   }
 
   setScore(score: number): void {
@@ -118,6 +143,9 @@ export class HudLayer extends Container {
     this.shieldBar.position.set(MARGIN, height - MARGIN - 12);
 
     this.fpsValue.position.set(width - MARGIN - this.fpsValue.width, MARGIN);
+
+    this.poseValue.position.set(width - MARGIN, height - MARGIN);
+    this.poseLabel.position.set(width - MARGIN, height - MARGIN - this.poseValue.height - 6);
 
     this.message.position.set(width / 2, height * 0.62);
 

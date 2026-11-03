@@ -37,16 +37,10 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
   protected override preUpdate(time: number, delta: number): void {
     super.preUpdate(time, delta);
 
+    // The world is borderless and the camera follows the ship, so bullets only
+    // expire by lifespan (no screen-edge culling).
     this.lifespanMs -= delta;
     if (this.lifespanMs <= 0) {
-      this.deactivate();
-      return;
-    }
-
-    // Cull anything that leaves the viewport.
-    const { width, height } = this.scene.scale;
-    const pad = 48;
-    if (this.x < -pad || this.x > width + pad || this.y < -pad || this.y > height + pad) {
       this.deactivate();
     }
   }

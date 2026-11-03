@@ -53,6 +53,8 @@ export const SPRITE_FACING_DEG = -90;
 export const Depths = {
   StarfieldFar: 0,
   StarfieldNear: 10,
+  /** Faint marker drawn at world (0, 0). */
+  OriginMarker: 15,
   Asteroids: 20,
   Bullets: 30,
   Player: 40,
@@ -74,16 +76,38 @@ export const Gameplay = {
   playerThrust: 420,
   playerTurnRate: 220, // degrees / second
   playerDrag: 0.55,
-  /** Display scale of the blueprint-built spaceship (1 = atlas pixels). */
-  spaceshipScale: 0.5,
+  /** Display scale of the blueprint-built spaceship (1 = atlas pixels; issue #6: no downscale). */
+  spaceshipScale: 1,
+  /**
+   * Virtual vertical resolution of the camera in world units. The camera zoom is
+   * `screenHeight / viewHeight`, so the ship stays full-size while a taller area of
+   * space is visible (bigger value = more world on screen, smaller ship on screen).
+   */
+  viewHeight: 2880,
+  /** Where the ship sits vertically on screen (0 = top, 0.5 = centre, 1 = bottom). */
+  shipScreenY: 0.6,
   playerStartShields: 3,
   playerInvulnerableMs: 1500,
   bulletSpeed: 620,
   bulletLifespanMs: 1100,
   fireCooldownMs: 180,
   asteroidSpawnMs: 900,
+  /** Cap for timed spawns only; split children may exceed it. */
   asteroidMaxCount: 18,
+  /** Display scale of every asteroid tier (issue #6). */
+  asteroidScale: 2,
+  asteroidMinSpeed: 70,
+  asteroidMaxSpeed: 170,
+  /** Extra distance beyond the farthest view corner where asteroids appear (world units). */
+  asteroidSpawnMargin: 200,
+  /** Asteroids farther than `spawn radius * this` from the ship are removed. */
+  asteroidDespawnFactor: 1.5,
+  /** Speed added to split children, in opposite directions (world units / s). */
+  asteroidSplitSpeed: 90,
   scorePerAsteroid: 10,
+  /** Parallax factors of the star layers relative to ship movement. */
+  starfieldFarParallax: 0.15,
+  starfieldNearParallax: 0.4,
 } as const;
 
 export const StorageKeys = {

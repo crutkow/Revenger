@@ -12,6 +12,8 @@ export interface GameEventMap {
   'game:over': [payload: { score: number; highScore: number; isNewRecord: boolean }];
   'hud:score': [score: number];
   'hud:shields': [current: number, max: number];
+  /** Ship pose: display coordinates (Y up) and compass heading (0 = north, clockwise). */
+  'hud:ship': [x: number, y: number, headingDeg: number];
   'hud:message': [text: string, durationMs?: number];
   'hud:clear-message': [];
 }
