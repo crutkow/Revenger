@@ -32,8 +32,16 @@ export const ITEM_TYPES: Readonly<Record<string, ItemType>> = {
     kind: 'inner',
     offset: { x: 17, y: 18 },
   },
-  'messhall-dining': { frame: 'inner-messhall-dining', kind: 'inner', offset: { x: 0, y: 0 } },
-  'messhall-table': { frame: 'inner-messhall-table', kind: 'inner', offset: { x: 0, y: 0 } },
+  'messhall-dining-left': {
+    frame: 'inner-messhall-dining-left',
+    kind: 'inner',
+    offset: { x: 0, y: 0 },
+  },
+  'messhall-dining-right': {
+    frame: 'inner-messhall-dining-right',
+    kind: 'inner',
+    offset: { x: 0, y: 0 },
+  },
   'engine-room': { frame: 'inner-engine-room-main', kind: 'inner', offset: { x: 0, y: 0 } },
 
   // Outer items
