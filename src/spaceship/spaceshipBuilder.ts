@@ -3,6 +3,8 @@ import {
   TILE_CELLS,
   TILE_PX,
   type CellPoint,
+  type CrewLayout,
+  type DoorLayout,
   type FrameSizeLookup,
   type PxPoint,
   type SpaceshipBlueprint,
@@ -10,7 +12,15 @@ import {
   type SpriteLayer,
   type SpritePlacement,
 } from './blueprintTypes';
+import { CREW_FRAMES } from './crew';
+import { leafPose } from './doors';
 import { ITEM_TYPES } from './itemTable';
+
+/** Door leaf frames (one leaf each, two leaves make a door) and the matching wall pieces. */
+const DOOR_FRAMES = {
+  h: { leaf: 'inner-door_horizontal', wall: 'inner-wall-horizontal' },
+  v: { leaf: 'inner-door_vertical', wall: 'inner-wall-vertical' },
+} as const;
 
 /**
  * Pure build logic for spaceship blueprints (rules: issue #4). No Phaser here:
@@ -326,21 +336,71 @@ function analyzeSpaceship(bp: SpaceshipBlueprint, sizeOf: FrameSizeLookup): Anal
         : [edge.x * CELL_PX, (edge.y + 0.5) * CELL_PX];
     pushSprite(walls, 'wall', frame, cx, cy);
   }
+  // A door edge has no wall piece: the opening is free floor. The two leaves (drawn above the
+  // walls) cover the edge and its two vertex pieces when closed and slide along the wall when open.
+  const doorsAbs: DoorLayout[] = [];
   for (const edge of innerEdges.values()) {
-    const isDoor = doorKeys.has(edgeKey(edge));
-    const frame = isDoor
-      ? edge.dir === 'h'
-        ? 'inner-door_horizontal'
-        : 'inner-door_vertical'
-      : edge.dir === 'h'
-        ? 'inner-wall-horizontal'
-        : 'inner-wall-vertical';
+    const frame = DOOR_FRAMES[edge.dir];
     const [cx, cy] =
       edge.dir === 'h'
         ? [(edge.x + 0.5) * CELL_PX, edge.y * CELL_PX]
         : [edge.x * CELL_PX, (edge.y + 0.5) * CELL_PX];
-    pushSprite(walls, 'wall', frame, cx, cy);
+
+    if (!doorKeys.has(edgeKey(edge))) {
+      pushSprite(walls, 'wall', frame.wall, cx, cy);
+      continue;
+    }
+    const leaf = frameSize(frame.leaf);
+    const leafLength = edge.dir === 'h' ? leaf.w : leaf.h;
+    doorsAbs.push({ x: cx, y: cy, axis: edge.dir, leafLength, travel: leafLength });
   }
+
+  // ---- Crew ---------------------------------------------------------------
+  const crewAbs: CrewLayout[] = [];
+  (bp.crew ?? []).forEach((member, index) => {
+    const label = `crew member ${index}`;
+    const path = member.path;
+    if (path.length === 0) {
+      errors.push(`${label} has an empty path`);
+      return;
+    }
+    let valid = true;
+    path.forEach((cell, i) => {
+      if (!isInt(cell.x, cell.y) || !inHull(cell.x, cell.y)) {
+        errors.push(`${label}: path cell (${cell.x}, ${cell.y}) is not inside the hull`);
+        valid = false;
+        return;
+      }
+      const prev = path[i - 1];
+      if (!prev || !isInt(prev.x, prev.y)) return;
+      if (prev.x !== cell.x && prev.y !== cell.y) {
+        errors.push(
+          `${label}: path step (${prev.x}, ${prev.y}) -> (${cell.x}, ${cell.y}) must follow a row or column`,
+        );
+        valid = false;
+        return;
+      }
+      // Walk the step cell by cell: inner walls may only be crossed at doors.
+      const stepX = Math.sign(cell.x - prev.x);
+      const stepY = Math.sign(cell.y - prev.y);
+      for (let x = prev.x, y = prev.y; x !== cell.x || y !== cell.y; x += stepX, y += stepY) {
+        const crossed: Edge =
+          stepX !== 0
+            ? { dir: 'v', x: stepX > 0 ? x + 1 : x, y }
+            : { dir: 'h', x, y: stepY > 0 ? y + 1 : y };
+        const key = edgeKey(crossed);
+        if (innerEdges.has(key) && !doorKeys.has(key)) {
+          errors.push(`${label}: path walks through an inner wall at ${key}`);
+          valid = false;
+        }
+      }
+    });
+    if (valid) {
+      crewAbs.push({
+        path: path.map((c) => ({ x: (c.x + 0.5) * CELL_PX, y: (c.y + 0.5) * CELL_PX })),
+      });
+    }
+  });
 
   // ---- Platform sprites ---------------------------------------------------
   const platform: SpritePlacement[] = [];
@@ -449,12 +509,44 @@ function analyzeSpaceship(bp: SpaceshipBlueprint, sizeOf: FrameSizeLookup): Anal
     y: s.y - pivot.y,
   });
 
+  const doors = doorsAbs.map((d) => ({ ...d, x: d.x - pivot.x, y: d.y - pivot.y }));
+  const crew = crewAbs.map((c) => ({
+    path: c.path.map((p) => ({ x: p.x - pivot.x, y: p.y - pivot.y })),
+  }));
+
+  // Two leaves per door, drawn closed; `SlidingDoor` moves and crops them at runtime.
+  const leaves: SpritePlacement[] = doors.flatMap((door, index) =>
+    ([-1, 1] as const).map((side) => {
+      const frame = DOOR_FRAMES[door.axis].leaf;
+      const pose = leafPose(door, side, 0);
+      const { w, h } = frameSize(frame);
+      return { frame, x: pose.x, y: pose.y, w, h, layer: 'door' as const, door: { index, side } };
+    }),
+  );
+
+  const crewSprites: SpritePlacement[] = crew.map((member, index) => {
+    const frame = CREW_FRAMES.idle;
+    const start = member.path[0] ?? { x: 0, y: 0 };
+    const { w, h } = frameSize(frame);
+    return { frame, x: start.x, y: start.y, w, h, layer: 'crew' as const, crew: { index } };
+  });
+
   return {
     errors,
     layout: {
       name: bp.name,
-      // Draw order: platform, inner items, walls and doors, outer items, flames.
-      sprites: [...platform, ...inner, ...walls, ...outer, ...flames].map(recenter),
+      // Draw order: platform, inner items, walls, door leaves, crew, outer items, flames.
+      sprites: [
+        ...platform.map(recenter),
+        ...inner.map(recenter),
+        ...walls.map(recenter),
+        ...leaves,
+        ...crewSprites,
+        ...outer.map(recenter),
+        ...flames.map(recenter),
+      ],
+      doors,
+      crew,
       size: { w: right - left, h: bottom - top },
       hullCenter: {
         x: (hullLeft + hullRight) / 2 - pivot.x,

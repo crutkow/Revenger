@@ -94,8 +94,10 @@ export class BattleScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown, this);
   }
 
-  override update(): void {
+  override update(_time: number, delta: number): void {
     if (this.isGameOver) return;
+
+    this.player.updateInterior(delta);
 
     const isDown = (keys: Phaser.Input.Keyboard.Key[]): boolean => keys.some((key) => key.isDown);
 

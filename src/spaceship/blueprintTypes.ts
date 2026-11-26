@@ -49,6 +49,16 @@ export interface ItemPlacement {
   tile: CellPoint;
 }
 
+/**
+ * Crew member that patrols a fixed path (issue #8, placeholder AI). The path is a list of
+ * cells: it starts at the first cell, walks to the next ones in a straight line each and
+ * walks back at the end. Segments run along rows or columns and may only cross inner
+ * walls at doors.
+ */
+export interface CrewSpec {
+  path: CellPoint[];
+}
+
 export interface SpaceshipBlueprint {
   name: string;
   /** Top-left cell of every 64x64 platform tile. */
@@ -59,10 +69,12 @@ export interface SpaceshipBlueprint {
   walls: WallSegment[];
   doors: DoorSpec[];
   items: ItemPlacement[];
+  /** Optional crew members (issue #8). */
+  crew?: CrewSpec[];
 }
 
 /** Draw order, bottom to top. */
-export type SpriteLayer = 'platform' | 'inner' | 'wall' | 'outer' | 'flame';
+export type SpriteLayer = 'platform' | 'inner' | 'wall' | 'door' | 'crew' | 'outer' | 'flame';
 
 export interface PxPoint {
   x: number;
@@ -82,12 +94,40 @@ export interface SpritePlacement {
   w: number;
   h: number;
   layer: SpriteLayer;
+  /** Set on the two leaves of a sliding door: index into `SpaceshipLayout.doors`. */
+  door?: { index: number; side: -1 | 1 };
+  /** Set on a crew member sprite: index into `SpaceshipLayout.crew`. */
+  crew?: { index: number };
+}
+
+/**
+ * Sliding door (issue #8) on one inner wall edge: two leaves that meet in the middle when
+ * closed and slide apart along the wall when open (design: `poer_ship_doors_*.png`). Leaves
+ * are the plain atlas sprites: never scaled, never cropped, drawn above the walls.
+ */
+export interface DoorLayout {
+  /** Edge centre relative to the pivot. */
+  x: number;
+  y: number;
+  /** `h`: door on a horizontal wall edge (leaves slide left/right), `v`: leaves slide up/down. */
+  axis: 'h' | 'v';
+  /** Length of one leaf along the slide axis, in pixels. */
+  leafLength: number;
+  /** Slide distance from closed to open (one leaf length). */
+  travel: number;
+}
+
+export interface CrewLayout {
+  /** Walk path in pixels relative to the pivot (cell centres). */
+  path: PxPoint[];
 }
 
 export interface SpaceshipLayout {
   name: string;
   /** Sprites in draw order (bottom to top). */
   sprites: SpritePlacement[];
+  doors: DoorLayout[];
+  crew: CrewLayout[];
   /** Platform bounding box size in pixels. Its centre is the ship pivot (0, 0). */
   size: PxSize;
   /** Hull bounding box centre and size, relative to the pivot. */

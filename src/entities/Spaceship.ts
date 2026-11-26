@@ -7,7 +7,9 @@ import type {
   SpaceshipLayout,
 } from '@/spaceship/blueprintTypes';
 import { buildSpaceshipLayout } from '@/spaceship/spaceshipBuilder';
+import { CrewMember } from './CrewMember';
 import type { TurnDirection } from './Ship';
+import { SlidingDoor } from './SlidingDoor';
 
 /** Frame sizes of the poer atlas, used to build and validate blueprints. */
 export const poerFrameSize: FrameSizeLookup = (name) => {
@@ -28,6 +30,8 @@ export class Spaceship extends Phaser.GameObjects.Container {
 
   readonly layout: SpaceshipLayout;
   private readonly flames: Phaser.GameObjects.Sprite[] = [];
+  private readonly doors: SlidingDoor[] = [];
+  private readonly crew: CrewMember[] = [];
 
   private invulnerableUntil = 0;
   private lastFiredAt = 0;
@@ -37,6 +41,8 @@ export class Spaceship extends Phaser.GameObjects.Container {
     this.layout = buildSpaceshipLayout(blueprint, poerFrameSize);
     const { size, hullCenter, hullSize } = this.layout;
 
+    const leaves = new Map<number, Partial<Record<-1 | 1, Phaser.GameObjects.Sprite>>>();
+    const crewSprites = new Map<number, Phaser.GameObjects.Sprite>();
     for (const placement of this.layout.sprites) {
       const sprite = scene.add.sprite(
         placement.x,
@@ -49,7 +55,24 @@ export class Spaceship extends Phaser.GameObjects.Container {
         sprite.setVisible(false);
         this.flames.push(sprite);
       }
+      if (placement.door) {
+        const pair = leaves.get(placement.door.index) ?? {};
+        pair[placement.door.side] = sprite;
+        leaves.set(placement.door.index, pair);
+      }
+      if (placement.crew) crewSprites.set(placement.crew.index, sprite);
     }
+
+    this.layout.doors.forEach((door, index) => {
+      const pair = leaves.get(index);
+      const first = pair?.[-1];
+      const second = pair?.[1];
+      if (first && second) this.doors.push(new SlidingDoor(door, { [-1]: first, 1: second }));
+    });
+    this.layout.crew.forEach((member, index) => {
+      const sprite = crewSprites.get(index);
+      if (sprite) this.crew.push(new CrewMember(member.path, sprite));
+    });
 
     this.setSize(size.w, size.h).setScale(Gameplay.spaceshipScale);
     scene.add.existing(this);
@@ -63,6 +86,13 @@ export class Spaceship extends Phaser.GameObjects.Container {
     body.setDrag(Gameplay.playerDrag, Gameplay.playerDrag);
     body.setMaxVelocity(Gameplay.playerMaxSpeed, Gameplay.playerMaxSpeed);
     body.setCollideWorldBounds(false);
+  }
+
+  /** Moves the crew and slides the doors. Call once per frame. */
+  updateInterior(dtMs: number): void {
+    for (const member of this.crew) member.update(dtMs);
+    const positions = this.crew.map((member) => member.position);
+    for (const door of this.doors) door.update(dtMs, positions);
   }
 
   private get arcade(): Phaser.Physics.Arcade.Body {

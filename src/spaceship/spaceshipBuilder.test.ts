@@ -64,15 +64,26 @@ describe('spaceship_01 blueprint', () => {
   });
 
   it('draws layers in the documented order', () => {
-    const order = ['platform', 'inner', 'wall', 'outer', 'flame'];
+    const order = ['platform', 'inner', 'wall', 'door', 'crew', 'outer', 'flame'];
     const layers = buildSpaceshipLayout(blueprint, sizeOf).sprites.map((s) =>
       order.indexOf(s.layer),
     );
     expect(layers).toEqual([...layers].sort((a, b) => a - b));
   });
 
-  it('uses two doors and no hull doors', () => {
-    expect(framesOf(blueprint).filter((f) => f === 'inner-door_horizontal')).toHaveLength(2);
+  it('has four doors made of two leaves each, and no hull doors', () => {
+    const layout = buildSpaceshipLayout(blueprint, sizeOf);
+    expect(layout.doors).toHaveLength(4);
+    const leaves = layout.sprites.filter((s) => s.layer === 'door');
+    expect(leaves).toHaveLength(8);
+    expect(leaves.filter((s) => s.frame === 'inner-door_horizontal')).toHaveLength(4);
+    expect(leaves.filter((s) => s.frame === 'inner-door_vertical')).toHaveLength(4);
+  });
+
+  it('has two crew members', () => {
+    const layout = buildSpaceshipLayout(blueprint, sizeOf);
+    expect(layout.crew).toHaveLength(2);
+    expect(layout.sprites.filter((s) => s.layer === 'crew')).toHaveLength(2);
   });
 });
 
@@ -150,8 +161,68 @@ describe('inner walls, doors and junctions', () => {
     const bp = twoRooms();
     bp.doors = [{ x: 2, y: 1, dir: 'v' }];
     const f = framesOf(bp);
-    expect(f.filter((n) => n === 'inner-door_vertical')).toHaveLength(1);
+    expect(f.filter((n) => n === 'inner-door_vertical')).toHaveLength(2); // two leaves
     expect(f.filter((n) => n === 'inner-wall-vertical')).toHaveLength(3 + 3); // 3 edges + 3 inner vertices
+  });
+
+  it('describes a door by its leaf length: each leaf slides one leaf length', () => {
+    const bp = twoRooms();
+    bp.doors = [{ x: 2, y: 1, dir: 'v' }];
+    const [door] = buildSpaceshipLayout(bp, sizeOf).doors;
+    expect(door).toEqual({
+      x: expect.any(Number),
+      y: expect.any(Number),
+      axis: 'v',
+      leafLength: 12,
+      travel: 12,
+    });
+  });
+
+  it('accepts crew that walks through a door and rejects walking through a wall', () => {
+    const bp = twoRooms();
+    bp.doors = [{ x: 2, y: 1, dir: 'v' }];
+    bp.crew = [
+      {
+        path: [
+          { x: 0, y: 1 },
+          { x: 3, y: 1 },
+        ],
+      },
+    ];
+    expect(validateSpaceship(bp, sizeOf)).toEqual([]);
+    bp.crew = [
+      {
+        path: [
+          { x: 0, y: 2 },
+          { x: 3, y: 2 },
+        ],
+      },
+    ];
+    expect(validateSpaceship(bp, sizeOf).join()).toMatch(/through an inner wall/);
+  });
+
+  it('rejects crew paths outside the hull or off the rows and columns', () => {
+    const bp = twoRooms();
+    bp.crew = [
+      {
+        path: [
+          { x: 0, y: 0 },
+          { x: 5, y: 0 },
+        ],
+      },
+    ];
+    expect(validateSpaceship(bp, sizeOf).join()).toMatch(/not inside the hull/);
+    bp.crew = [
+      {
+        path: [
+          { x: 0, y: 0 },
+          { x: 1, y: 1 },
+        ],
+      },
+    ];
+    expect(validateSpaceship(bp, sizeOf).join()).toMatch(/row or column/);
+    bp.crew = [{ path: [] }];
+    expect(validateSpaceship(bp, sizeOf).join()).toMatch(/empty path/);
   });
 
   it('builds T and cross junctions from inner walls', () => {

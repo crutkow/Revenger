@@ -83,7 +83,8 @@ export const Gameplay = {
    * `screenHeight / viewHeight`, so the ship stays full-size while a taller area of
    * space is visible (bigger value = more world on screen, smaller ship on screen).
    */
-  viewHeight: 2880,
+  //viewHeight: 2880,
+  viewHeight: 1440,
   /** Where the ship sits vertically on screen (0 = top, 0.5 = centre, 1 = bottom). */
   shipScreenY: 0.6,
   playerStartShields: 3,
@@ -105,6 +106,18 @@ export const Gameplay = {
   /** Speed added to split children, in opposite directions (world units / s). */
   asteroidSplitSpeed: 90,
   scorePerAsteroid: 10,
+  /** Crew walking speed in ship pixels per second (issue #8). */
+  crewSpeed: 36,
+  /** Crew waits this long at both ends of its path. */
+  crewEndWaitMs: 1200,
+  /** Duration of one walk animation frame. */
+  crewStepFrameMs: 160,
+  /** A door opens when a crew member is within this distance (1 cell = 16 px) of its centre. */
+  doorOpenRadius: 16,
+  /** Time a door needs to slide fully open or closed. */
+  doorSlideMs: 250,
+  /** A door starts closing this long after the last crew member left. */
+  doorCloseDelayMs: 300,
   /** Parallax factors of the star layers relative to ship movement. */
   starfieldFarParallax: 0.15,
   starfieldNearParallax: 0.4,
