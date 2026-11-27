@@ -112,8 +112,12 @@ export const Gameplay = {
   crewEndWaitMs: 1200,
   /** Duration of one walk animation frame. */
   crewStepFrameMs: 160,
-  /** A door opens when a crew member is within this distance (1 cell = 16 px) of its centre. */
-  doorOpenRadius: 16,
+  /**
+   * A door opens when a crew member is within this distance of its centre. Crew stands on
+   * nodes 16 px (1 cell) from the door node, so keep it below 16: a member waiting next to the
+   * door must not hold it open.
+   */
+  doorOpenRadius: 14,
   /** Time a door needs to slide fully open or closed. */
   doorSlideMs: 250,
   /** A door starts closing this long after the last crew member left. */

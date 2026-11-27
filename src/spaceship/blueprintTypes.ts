@@ -1,8 +1,18 @@
 /**
  * Spaceship blueprint (`public/assets/ships/spaceship_*.json`).
  * Build rules: GitHub issue #4. All positions are whole **cells** of 16 px,
- * origin = top-left of the ship, +x right, +y down. Wall coordinates are
- * grid-line vertices (a vertex (x, y) is the top-left corner of cell (x, y)).
+ * origin = top-left of the ship, +x right, +y down.
+ *
+ * Two grids (issue #9), the second one is offset by half a cell from the first:
+ *
+ * - **Cell grid**: hull and platform. The cell (x, y) covers (x * 16 .. x * 16 + 16) px.
+ *   Walls run along the lines between cells.
+ * - **Node grid**: the points where those lines cross, i.e. the corners of the cells. Node
+ *   (x, y) lies at (x * 16, y * 16) px, so a 4x4 cell room (64 px) has 3x3 = 9 nodes inside
+ *   it, the middle one at the centre of the room. Crew stands and walks on nodes, room items
+ *   are placed on nodes, and a door sits on a node of a straight inner wall: the middle of
+ *   a 4 cell wall. Nodes on a wall are not walkable, except door nodes.
+ *   See `grid.ts` for the conversions.
  */
 
 /** Edge length of one grid cell in pixels. */
@@ -13,6 +23,15 @@ export const TILE_CELLS = 4;
 export const TILE_PX = CELL_PX * TILE_CELLS;
 
 export interface CellPoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * Node of the second grid, offset by half a cell from the cell centres (issue #9).
+ * Node (x, y) is the top-left corner of cell (x, y), at (x * 16, y * 16) px.
+ */
+export interface NodePoint {
   x: number;
   y: number;
 }
@@ -33,8 +52,10 @@ export interface WallSegment {
 }
 
 /**
- * Door on one 16 px wall edge that starts at vertex (x, y):
- * `h` = edge going right to (x + 1, y), `v` = edge going down to (x, y + 1).
+ * Door on node (x, y) of a straight inner wall. `dir` is the direction of the wall:
+ * `h` = horizontal wall (the leaves slide left/right), `v` = vertical wall (up/down).
+ * The wall must continue on both sides of the node. The door is 24 px wide: it replaces
+ * the wall edge on each side of the node (the two 16 px edges) except the outer 4 px.
  */
 export interface DoorSpec {
   x: number;
@@ -42,21 +63,32 @@ export interface DoorSpec {
   dir: 'h' | 'v';
 }
 
+/**
+ * An item is placed in one of two ways (exactly one of `tile` / `node`):
+ *
+ * - `tile`: top-left cell of the platform tile that holds it. The sprite sits at the fixed
+ *   position of its `ITEM_TYPES` entry (inner and outer items).
+ * - `node`: node of the second grid (issue #9). Only inner (room) items. The sprite centre
+ *   is the node plus the optional pixel `offset` for precise placing.
+ */
 export interface ItemPlacement {
   /** Key of `ITEM_TYPES`. */
   type: string;
-  /** Top-left cell of the platform tile that holds the item. */
-  tile: CellPoint;
+  tile?: CellPoint;
+  node?: NodePoint;
+  /** Pixel offset of the sprite centre from its node. Only used together with `node`. */
+  offset?: PxPoint;
 }
 
 /**
  * Crew member that patrols a fixed path (issue #8, placeholder AI). The path is a list of
- * cells: it starts at the first cell, walks to the next ones in a straight line each and
- * walks back at the end. Segments run along rows or columns and may only cross inner
+ * nodes of the second grid (issue #9): it starts at the first node, walks to the next ones in
+ * a straight line each and walks back at the end. Nodes must be floor nodes (inside a room,
+ * not on a wall) or door nodes. Segments run along rows or columns and may only cross inner
  * walls at doors.
  */
 export interface CrewSpec {
-  path: CellPoint[];
+  path: NodePoint[];
 }
 
 export interface SpaceshipBlueprint {
@@ -101,24 +133,48 @@ export interface SpritePlacement {
 }
 
 /**
- * Sliding door (issue #8) on one inner wall edge: two leaves that meet in the middle when
+ * Sliding door (issue #8) on a node of an inner wall: two leaves that meet in the middle when
  * closed and slide apart along the wall when open (design: `poer_ship_doors_*.png`). Leaves
  * are the plain atlas sprites: never scaled, never cropped, drawn above the walls.
  */
 export interface DoorLayout {
-  /** Edge centre relative to the pivot. */
+  /** Door node (its centre) in pixels relative to the pivot. */
   x: number;
   y: number;
-  /** `h`: door on a horizontal wall edge (leaves slide left/right), `v`: leaves slide up/down. */
+  /** The door node on the grid. */
+  node: NodePoint;
+  /** `h`: door on a horizontal wall (leaves slide left/right), `v`: leaves slide up/down. */
   axis: 'h' | 'v';
   /** Length of one leaf along the slide axis, in pixels. */
   leafLength: number;
   /** Slide distance from closed to open (one leaf length). */
   travel: number;
+  /**
+   * The two floor nodes on both sides of the door (issue #9): left/right of a vertical door,
+   * above/below a horizontal one. The door node is half way between them.
+   */
+  nodes: [NodePoint, NodePoint];
+}
+
+/** Walkable node of the second grid. `x`/`y` are pixels relative to the pivot. */
+export interface NavNode {
+  node: NodePoint;
+  x: number;
+  y: number;
+}
+
+/**
+ * Walkability graph of the node grid (issue #9): the nodes are the floor nodes inside the
+ * rooms plus the door nodes; neighbouring nodes (16 px apart) are linked.
+ */
+export interface NavGraph {
+  nodes: NavNode[];
+  /** Pairs of indices into `nodes`, each link listed once. */
+  links: [number, number][];
 }
 
 export interface CrewLayout {
-  /** Walk path in pixels relative to the pivot (cell centres). */
+  /** Walk path in pixels relative to the pivot (node positions). */
   path: PxPoint[];
 }
 
@@ -128,6 +184,10 @@ export interface SpaceshipLayout {
   sprites: SpritePlacement[];
   doors: DoorLayout[];
   crew: CrewLayout[];
+  /** Walkability graph of the node grid. */
+  nav: NavGraph;
+  /** Top-left corner of every hull cell in pixels relative to the pivot (debug overlay). */
+  hullCells: PxPoint[];
   /** Platform bounding box size in pixels. Its centre is the ship pivot (0, 0). */
   size: PxSize;
   /** Hull bounding box centre and size, relative to the pivot. */

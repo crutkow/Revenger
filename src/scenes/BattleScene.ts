@@ -232,6 +232,7 @@ export class BattleScene extends Phaser.Scene {
     };
 
     keyboard.on('keydown-ESC', () => this.returnToMenu());
+    keyboard.on('keydown-G', () => this.player.toggleGridOverlay());
   }
 
   private fire(): void {
@@ -424,6 +425,7 @@ export class BattleScene extends Phaser.Scene {
     this.scale.off(Phaser.Scale.Events.RESIZE, this.handleResize, this);
     this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.syncCamera, this);
     this.input.keyboard?.off('keydown-ESC');
+    this.input.keyboard?.off('keydown-G');
     this.spawnTimer?.remove();
   }
 }

@@ -2,13 +2,18 @@ import { describe, expect, it } from 'vitest';
 import type { DoorLayout } from './blueprintTypes';
 import { createDoorState, isNearDoor, leafPose, stepDoor } from './doors';
 
-/** Door on a horizontal wall edge: 12 px leaves, each slides one leaf length. */
+/** Door on a horizontal wall node: 12 px leaves, each slides one leaf length. */
 const hDoor: DoorLayout = {
   x: 100,
   y: 50,
+  node: { x: 6, y: 3 },
   axis: 'h',
   leafLength: 12,
   travel: 12,
+  nodes: [
+    { x: 6, y: 2 },
+    { x: 6, y: 4 },
+  ],
 };
 
 describe('leafPose', () => {

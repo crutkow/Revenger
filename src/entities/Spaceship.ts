@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 import { getAtlasFrame, hasAtlasFrame } from '@/atlas/AtlasRegistry';
-import { Gameplay, SPRITE_FACING_DEG, TextureKeys } from '@/config/constants';
-import type {
-  FrameSizeLookup,
-  SpaceshipBlueprint,
-  SpaceshipLayout,
+import { Gameplay, Palette, SPRITE_FACING_DEG, TextureKeys } from '@/config/constants';
+import {
+  CELL_PX,
+  type FrameSizeLookup,
+  type SpaceshipBlueprint,
+  type SpaceshipLayout,
 } from '@/spaceship/blueprintTypes';
 import { buildSpaceshipLayout } from '@/spaceship/spaceshipBuilder';
 import { CrewMember } from './CrewMember';
@@ -33,6 +34,7 @@ export class Spaceship extends Phaser.GameObjects.Container {
   private readonly doors: SlidingDoor[] = [];
   private readonly crew: CrewMember[] = [];
 
+  private gridOverlay?: Phaser.GameObjects.Graphics;
   private invulnerableUntil = 0;
   private lastFiredAt = 0;
 
@@ -93,6 +95,39 @@ export class Spaceship extends Phaser.GameObjects.Container {
     for (const member of this.crew) member.update(dtMs);
     const positions = this.crew.map((member) => member.position);
     for (const door of this.doors) door.update(dtMs, positions);
+  }
+
+  /**
+   * Debug overlay for the two grids (issue #9): the cell grid (hull cells, blue) and the node
+   * grid offset by half a cell (walkable nodes and links, orange; door nodes, red). Returns
+   * the new visibility.
+   */
+  toggleGridOverlay(): boolean {
+    if (this.gridOverlay) {
+      this.gridOverlay.destroy();
+      this.gridOverlay = undefined;
+      return false;
+    }
+    const g = this.scene.add.graphics();
+    const { nodes, links } = this.layout.nav;
+
+    g.lineStyle(1, Palette.Hud, 0.4);
+    for (const cell of this.layout.hullCells) g.strokeRect(cell.x, cell.y, CELL_PX, CELL_PX);
+
+    g.lineStyle(1, Palette.Thruster, 0.7);
+    for (const [a, b] of links) {
+      const from = nodes[a];
+      const to = nodes[b];
+      if (from && to) g.lineBetween(from.x, from.y, to.x, to.y);
+    }
+    g.fillStyle(Palette.Thruster, 0.9);
+    for (const node of nodes) g.fillCircle(node.x, node.y, 1.5);
+    g.fillStyle(Palette.Danger, 0.9);
+    for (const door of this.layout.doors) g.fillCircle(door.x, door.y, 2.5);
+
+    this.add(g);
+    this.gridOverlay = g;
+    return true;
   }
 
   private get arcade(): Phaser.Physics.Arcade.Body {
